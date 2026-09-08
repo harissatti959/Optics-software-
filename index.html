@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shaheer Opticals - OptiPOS (All-in-One)</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React 18 & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- JSBarcode for Thermal Barcodes -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0A0A0B;
+      color: #E2E8F0;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printable-area, #printable-area * {
+        visibility: visible;
+      }
+      #printable-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#0A0A0B] text-slate-100 selection:bg-amber-500 selection:text-slate-950">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // Optical Inventory Data
+    const INITIAL_INVENTORY = [
+      {
+        id: 'inv_1',
+        sku: 'SO-FRM-1001',
+        barcodeSKU: 'SO-FRM-1001',
+        name: 'Clubmaster Classic Acetate Frame',
+        category: 'Frame',
+        brand: 'Ray-Ban',
+        modelNo: 'RB3016-W0365',
+        purchaseCost: 5500,
+        sellingPrice: 9500,
+        currentStock: 14,
+        minStockAlert: 3,
+        location: 'Shelf A-1'
+      },
+      {
+        id: 'inv_2',
+        sku: 'SO-FRM-1002',
+        barcodeSKU: 'SO-FRM-1002',
+        name: 'Aviator Full Metal Gold Rim',
+        category: 'Frame',
+        brand: 'Gucci Eyewear',
+        modelNo: 'GG-0061S',
+        purchaseCost: 9800,
+        sellingPrice: 17000,
+        currentStock: 8,
+        minStockAlert: 2,
+        location: 'Display Case 2'
+      },
+      {
+        id: 'inv_3',
+        sku: 'SO-FRM-1003',
+        barcodeSKU: 'SO-FRM-1003',
+        name: 'Titanium Rimless Featherlight Frame',
+        category: 'Frame',
+        brand: 'Silhouette',
+        modelNo: 'TMA-5515',
+        purchaseCost: 7200,
+        sellingPrice: 12500,
+        currentStock: 2,
+        minStockAlert: 3,
+        location: 'Shelf B-3'
+      },
+      {
+        id: 'inv_4',
+        sku: 'SO-LNS-2001',
+        barcodeSKU: 'SO-LNS-2001',
+        name: '1.56 Anti-Blue Light HMC Optical Lens (Pair)',
+        category: 'Lens',
+        brand: 'Crizal Prevencia',
+        modelNo: '1.56-BLUE-CUT',
+        purchaseCost: 2200,
+        sellingPrice: 4200,
+        currentStock: 35,
+        minStockAlert: 10,
+        location: 'Lens Lab Cabinet 1'
+      },
+      {
+        id: 'inv_5',
+        sku: 'SO-LNS-2002',
+        barcodeSKU: 'SO-LNS-2002',
+        name: '1.67 High Index Photochromic Transition Lens',
+        category: 'Lens',
+        brand: 'Essilor Transitions Gen 8',
+        modelNo: '1.67-TRANS-GRY',
+        purchaseCost: 7500,
+        sellingPrice: 13500,
+        currentStock: 6,
+        minStockAlert: 3,
+        location: 'Lens Lab Cabinet 2'
+      },
+      {
+        id: 'inv_6',
+        sku: 'SO-SUN-3001',
+        barcodeSKU: 'SO-SUN-3001',
+        name: 'Polarized Wayfarer Matte Black Sunglasses',
+        category: 'Sunglasses',
+        brand: 'Oakley',
+        modelNo: 'OO9102-Holbrook',
+        purchaseCost: 8200,
+        sellingPrice: 14500,
+        currentStock: 9,
+        minStockAlert: 2,
+        location: 'Sunglasses Stand 1'
+      },
+      {
+        id: 'inv_7',
+        sku: 'SO-SOL-4001',
+        barcodeSKU: 'SO-SOL-4001',
+        name: 'Multi-Purpose Contact Lens Solution 360ml',
+        category: 'Solution',
+        brand: 'Renu Fresh Bausch+Lomb',
+        modelNo: 'RENU-360',
+        purchaseCost: 550,
+        sellingPrice: 950,
+        currentStock: 24,
+        minStockAlert: 5,
+        location: 'Front Counter'
+      }
+    ];
+
+    const INITIAL_SALES = [
+      {
+        id: 'sale_1',
+        invoiceNumber: 'OPT-2026-001',
+        createdAt: '2026-09-06T11:20:00Z',
+        customer: { name: 'Muhammad Haris Satti', phone: '+923001234567', address: 'Islamabad' },
+        items: [
+          { name: 'Clubmaster Classic Acetate Frame', quantity: 1, unitPrice: 9500, totalPrice: 9500 },
+          { name: '1.56 Anti-Blue Light HMC Optical Lens (Pair)', quantity: 1, unitPrice: 4200, totalPrice: 4200 }
+        ],
+        subtotal: 13700,
+        discountAmount: 700,
+        fittingFee: 300,
+        grandTotal: 13300,
+        advancePaid: 8000,
+        balanceDue: 5300,
+        paymentMethod: 'JazzCash',
+        paymentStatus: 'Partial',
+        orderStatus: 'In Lab Fitting'
+      }
+    ];
+
+    function App() {
+      // LocalStorage synced state
+      const [inventory, setInventory] = useState(() => {
+        const saved = localStorage.getItem('shaheer_opt_inventory');
+        return saved ? JSON.parse(saved) : INITIAL_INVENTORY;
+      });
+
+      const [sales, setSales] = useState(() => {
+        const saved = localStorage.getItem('shaheer_opt_sales');
+        return saved ? JSON.parse(saved) : INITIAL_SALES;
+      });
+
+      useEffect(() => {
+        localStorage.setItem('shaheer_opt_inventory', JSON.stringify(inventory));
+      }, [inventory]);
+
+      useEffect(() => {
+        localStorage.setItem('shaheer_opt_sales', JSON.stringify(sales));
+      }, [sales]);
+
+      // Navigation & Roles
+      const [activeTab, setActiveTab] = useState('pos');
+      const [userRole, setUserRole] = useState('Admin'); // 'Admin' vs 'Salesman'
+
+      // POS Form State
+      const [cart, setCart] = useState([]);
+      const [customerName, setCustomerName] = useState('');
+      const [customerPhone, setCustomerPhone] = useState('');
+      const [customerAddress, setCustomerAddress] = useState('');
+      const [discountAmount, setDiscountAmount] = useState(0);
+      const [fittingFee, setFittingFee] = useState(0);
+      const [advancePaid, setAdvancePaid] = useState(0);
+      const [paymentMethod, setPaymentMethod] = useState('Cash');
+      const [scannerInput, setScannerInput] = useState('');
+      const [activeReceiptSale, setActiveReceiptSale] = useState(null);
+      const [selectedStickerItem, setSelectedStickerItem] = useState(INITIAL_INVENTORY[0]);
+
+      // Hardware Barcode Scanner Gun Listener
+      useEffect(() => {
+        let buffer = '';
+        let lastKeyTime = Date.now();
+
+        const handleKeyDown = (e) => {
+          if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+            return;
+          }
+          const currentTime = Date.now();
+          if (currentTime - lastKeyTime > 100) buffer = '';
+          lastKeyTime = currentTime;
+
+          if (e.key === 'Enter') {
+            if (buffer.length >= 4) {
+              handleBarcodeScan(buffer.trim());
+              buffer = '';
+            }
+          } else if (e.key.length === 1) {
+            buffer += e.key;
+          }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [inventory]);
+
+      const handleBarcodeScan = (scannedCode) => {
+        const found = inventory.find(
+          item => item.sku.toLowerCase() === scannedCode.toLowerCase() ||
+                  item.barcodeSKU.toLowerCase() === scannedCode.toLowerCase()
+        );
+        if (found) {
+          addToCart(found);
+          alert(`Scanned: ${found.name}`);
+        } else {
+          alert(`Barcode "${scannedCode}" not found!`);
+        }
+      };
+
+      const addToCart = (product) => {
+        setCart(prev => {
+          const existing = prev.find(item => item.id === product.id);
+          if (existing) {
+            if (existing.quantity >= product.currentStock) {
+              alert(`Only ${product.currentStock} units in stock!`);
+              return prev;
+            }
+            return prev.map(item =>
+              item.id === product.id ? { ...item, quantity: item.quantity + 1, totalPrice: (item.quantity + 1) * item.unitPrice } : item
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: product.id,
+              name: product.name,
+              category: product.category,
+              unitPrice: product.sellingPrice,
+              quantity: 1,
+              totalPrice: product.sellingPrice
+            }
+          ];
+        });
+      };
+
+      const removeFromCart = (id) => setCart(prev => prev.filter(i => i.id !== id));
+      const updateCartQty = (id, newQty) => {
+        if (newQty <= 0) return removeFromCart(id);
+        setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty, totalPrice: newQty * i.unitPrice } : i));
+      };
+
+      const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.totalPrice, 0), [cart]);
+      const grandTotal = Math.max(0, subtotal - Number(discountAmount || 0) + Number(fittingFee || 0));
+      const balanceDue = Math.max(0, grandTotal - Number(advancePaid || 0));
+
+      const handleCheckout = () => {
+        if (cart.length === 0) return alert('Cart is empty!');
+        if (!customerName.trim()) return alert('Please enter Customer Name!');
+
+        const invoiceNum = `OPT-2026-${String(sales.length + 101).padStart(3, '0')}`;
+        const newSale = {
+          id: 'sale_' + Date.now(),
+          invoiceNumber: invoiceNum,
+          createdAt: new Date().toISOString(),
+          customer: {
+            name: customerName,
+            phone: customerPhone || '+923000000000',
+            address: customerAddress || 'Walk-in Customer'
+          },
+          items: [...cart],
+          subtotal,
+          discountAmount: Number(discountAmount) || 0,
+          fittingFee: Number(fittingFee) || 0,
+          grandTotal,
+          advancePaid: Number(advancePaid) || 0,
+          balanceDue,
+          paymentMethod,
+          paymentStatus: balanceDue === 0 ? 'Paid' : (Number(advancePaid) > 0 ? 'Partial' : 'Unpaid'),
+          orderStatus: 'In Lab Fitting'
+        };
+
+        // Deduct inventory
+        setInventory(prev => prev.map(invItem => {
+          const cartMatch = cart.find(c => c.id === invItem.id);
+          return cartMatch ? { ...invItem, currentStock: Math.max(0, invItem.currentStock - cartMatch.quantity) } : invItem;
+        }));
+
+        setSales(prev => [newSale, ...prev]);
+        if (window.confetti) window.confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+
+        // Reset
+        setCart([]);
+        setCustomerName('');
+        setCustomerPhone('');
+        setCustomerAddress('');
+        setDiscountAmount(0);
+        setFittingFee(0);
+        setAdvancePaid(0);
+        setActiveReceiptSale(newSale);
+      };
+
+      const generateWhatsAppReceiptText = (sale) => {
+        let text = `👓 *SHAHEER OPTICALS - OFFICIAL RECEIPT*\n`;
+        text += `Suite #12, Optical Plaza, Blue Area, Islamabad\n`;
+        text += `Tel: +92 300 1234567\n`;
+        text += `----------------------------------------\n`;
+        text += `*Invoice:* ${sale.invoiceNumber}\n`;
+        text += `*Date:* ${new Date(sale.createdAt).toLocaleDateString()}\n`;
+        text += `*Customer:* ${sale.customer.name} (${sale.customer.phone})\n`;
+        text += `----------------------------------------\n`;
+        text += `*ITEMS BILLED:*\n`;
+        sale.items.forEach((it, idx) => {
+          text += `${idx + 1}. ${it.name} x ${it.quantity} = PKR ${it.totalPrice.toLocaleString()}\n`;
+        });
+        text += `----------------------------------------\n`;
+        text += `*Grand Total:* PKR ${sale.grandTotal.toLocaleString()}\n`;
+        text += `*Advance Paid:* PKR ${sale.advancePaid.toLocaleString()}\n`;
+        text += `*Balance Due:* PKR ${sale.balanceDue.toLocaleString()}\n`;
+        text += `*Status:* ${sale.orderStatus}\n`;
+        text += `----------------------------------------\n`;
+        text += `Thank you for choosing Shaheer Opticals!`;
+        return text;
+      };
+
+      const sendViaWhatsApp = (sale) => {
+        const text = encodeURIComponent(generateWhatsAppReceiptText(sale));
+        const phone = sale.customer.phone.replace(/[^0-9]/g, '');
+        window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${text}`, '_blank');
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="bg-[#0F0F12] border-b border-[#1E1E24] px-4 py-3 sticky top-0 z-30">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xl shadow-lg shadow-amber-500/20">
+                  👓
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-lg font-bold text-white tracking-tight">Shaheer Opticals</h1>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                      OptiPOS
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      MongoDB: Connected
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                      WhatsApp: Active
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation Tabs */}
+              <nav className="flex items-center bg-[#0A0A0B] p-1 rounded-xl border border-[#26262E] text-xs">
+                {['pos', 'prescription', 'inventory', 'labels', 'sales'].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-3 py-1.5 rounded-lg font-medium capitalize transition cursor-pointer ${
+                      activeTab === tab ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {tab === 'pos' ? '🛒 POS Register' : tab === 'prescription' ? '📝 Rx Matrix' : tab === 'inventory' ? '📦 Inventory' : tab === 'labels' ? '🏷️ Labels' : '📋 Invoices'}
+                  </button>
+                ))}
+              </nav>
+
+              {/* Role Toggle */}
+              <button
+                onClick={() => setUserRole(prev => prev === 'Admin' ? 'Salesman' : 'Admin')}
+                className="px-3 py-1.5 rounded-lg bg-[#18181E] hover:bg-[#202028] border border-[#2B2B36] text-xs font-mono text-slate-300 cursor-pointer"
+              >
+                {userRole === 'Admin' ? '👑 Owner (Admin)' : '👤 Salesman'}
+              </button>
+            </div>
+          </header>
+
+          {/* Body Content */}
+          <main className="max-w-7xl mx-auto w-full p-4 flex-1">
+            {activeTab === 'pos' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Catalog & Barcode */}
+                <div className="lg:col-span-7 space-y-4">
+                  <div className="bg-[#0F0F12] border border-[#1E1E24] p-3 rounded-2xl flex items-center gap-3">
+                    <span>🔫</span>
+                    <input
+                      type="text"
+                      placeholder="Scan Barcode (e.g. SO-FRM-1001) or Type SKU..."
+                      value={scannerInput}
+                      onChange={(e) => setScannerInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && scannerInput.trim()) {
+                          handleBarcodeScan(scannerInput.trim());
+                          setScannerInput('');
+                        }
+                      }}
+                      className="w-full bg-transparent border-none text-white text-sm focus:outline-none font-mono"
+                    />
+                    <button
+                      onClick={() => {
+                        if (scannerInput.trim()) {
+                          handleBarcodeScan(scannerInput.trim());
+                          setScannerInput('');
+                        }
+                      }}
+                      className="px-3 py-1 bg-amber-500 text-slate-950 rounded-lg text-xs font-bold font-mono"
+                    >
+                      Scan
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto pr-1">
+                    {inventory.map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => addToCart(item)}
+                        className="bg-[#0F0F12] border border-[#1E1E24] hover:border-amber-500/50 p-3 rounded-2xl cursor-pointer flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                            <span className="text-amber-400 font-bold">{item.category}</span>
+                            <span className={item.currentStock <= item.minStockAlert ? 'text-red-400 font-bold' : 'text-emerald-400'}>
+                              Stock: {item.currentStock}
+                            </span>
+                          </div>
+                          <h3 className="text-sm font-semibold text-white mt-1">{item.name}</h3>
+                          <p className="text-xs text-slate-400 font-mono">{item.brand} • {item.sku}</p>
+                        </div>
+                        <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#18181E]">
+                          <span className="text-sm font-bold font-mono text-white">PKR {item.sellingPrice.toLocaleString()}</span>
+                          {userRole === 'Admin' && (
+                            <span className="text-[10px] text-slate-500 font-mono">Cost: {item.purchaseCost}</span>
+                          )}
+                          <span className="px-2 py-1 bg-amber-500/10 text-amber-400 text-xs font-bold rounded-lg font-mono">+ Add</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cart & Billing Desk */}
+                <div className="lg:col-span-5 bg-[#0F0F12] border border-[#1E1E24] rounded-2xl p-4 flex flex-col justify-between space-y-4">
+                  <div>
+                    <h2 className="text-base font-bold text-white border-b border-[#1E1E24] pb-2">🛒 POS Billing Desk</h2>
+                    <div className="mt-3 space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Customer Name *"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full bg-[#0A0A0B] border border-[#26262E] rounded-xl px-3 py-2 text-xs text-white"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="WhatsApp Phone (e.g. 03001234567)"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
+                          className="bg-[#0A0A0B] border border-[#26262E] rounded-xl px-3 py-2 text-xs text-white font-mono"
+                        />
+                        <input
+                          type="text"
+                          placeholder="City / Address"
+                          value={customerAddress}
+                          onChange={(e) => setCustomerAddress(e.target.value)}
+                          className="bg-[#0A0A0B] border border-[#26262E] rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 space-y-2 max-h-[200px] overflow-y-auto">
+                      {cart.length === 0 ? (
+                        <div className="p-6 text-center text-slate-500 text-xs font-mono border border-dashed border-[#1E1E24] rounded-xl">
+                          Cart empty. Click products or scan barcodes.
+                        </div>
+                      ) : (
+                        cart.map(item => (
+                          <div key={item.id} className="flex items-center justify-between bg-[#0A0A0B] p-2 rounded-xl border border-[#1E1E24] text-xs">
+                            <div className="flex-1 mr-2">
+                              <p className="font-semibold text-white truncate">{item.name}</p>
+                              <p className="text-[10px] text-slate-400 font-mono">PKR {item.unitPrice.toLocaleString()}</p>
+                            </div>
+                            <div className="flex items-center space-x-1.5">
+                              <button onClick={() => updateCartQty(item.id, item.quantity - 1)} className="w-5 h-5 rounded bg-[#18181E] text-slate-300">-</button>
+                              <span className="font-mono text-white font-bold">{item.quantity}</span>
+                              <button onClick={() => updateCartQty(item.id, item.quantity + 1)} className="w-5 h-5 rounded bg-[#18181E] text-slate-300">+</button>
+                              <span className="font-mono text-amber-400 font-bold min-w-[65px] text-right">{item.totalPrice.toLocaleString()}</span>
+                              <button onClick={() => removeFromCart(item.id)} className="text-slate-500 hover:text-red-400 ml-1">×</button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Calculations */}
+                  <div className="border-t border-[#1E1E24] pt-3 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between text-slate-400">
+                      <span>Subtotal</span>
+                      <span className="text-white font-bold">PKR {subtotal.toLocaleString()}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        placeholder="Discount (PKR)"
+                        value={discountAmount || ''}
+                        onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                        className="bg-[#0A0A0B] border border-[#26262E] rounded-lg p-1.5 text-xs text-white"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Fitting Fee (PKR)"
+                        value={fittingFee || ''}
+                        onChange={(e) => setFittingFee(Number(e.target.value))}
+                        className="bg-[#0A0A0B] border border-[#26262E] rounded-lg p-1.5 text-xs text-white"
+                      />
+                    </div>
+                    <div className="flex justify-between text-sm font-bold text-white pt-1 border-t border-[#1E1E24]">
+                      <span>Grand Total</span>
+                      <span className="text-amber-400 text-base">PKR {grandTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-emerald-400 block font-bold">Advance Paid</label>
+                        <input
+                          type="number"
+                          value={advancePaid}
+                          onChange={(e) => setAdvancePaid(Number(e.target.value))}
+                          className="w-full bg-[#0A0A0B] border border-emerald-500/40 rounded-lg p-1.5 text-xs text-emerald-400 font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-amber-400 block font-bold">Balance Due</label>
+                        <div className="bg-[#0A0A0B] border border-[#26262E] rounded-lg p-1.5 text-xs text-amber-400 font-bold">
+                          PKR {balanceDue.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCheckout}
+                      className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm tracking-wide shadow-lg shadow-amber-500/20 cursor-pointer"
+                    >
+                      Complete Sale & Generate Receipt ⚡
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Prescriptions Tab */}
+            {activeTab === 'prescription' && (
+              <div className="bg-[#0F0F12] border border-[#1E1E24] rounded-2xl p-6 max-w-4xl mx-auto space-y-4">
+                <h2 className="text-lg font-bold text-white">👓 Dual-Eye Optical Prescription (Rx Matrix)</h2>
+                <div className="overflow-x-auto border border-[#1E1E24] rounded-xl">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-[#141418] text-amber-400 uppercase text-[10px] border-b border-[#1E1E24]">
+                      <tr>
+                        <th className="p-3">Eye</th>
+                        <th className="p-3">Sphere (SPH)</th>
+                        <th className="p-3">Cylinder (CYL)</th>
+                        <th className="p-3">Axis (0-180°)</th>
+                        <th className="p-3">Addition (ADD)</th>
+                        <th className="p-3">Visual Acuity</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1E1E24]">
+                      <tr>
+                        <td className="p-3 font-bold text-white">OD (Right Eye)</td>
+                        <td className="p-2"><input type="number" step="0.25" defaultValue="-2.25" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                        <td className="p-2"><input type="number" step="0.25" defaultValue="-0.75" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                        <td className="p-2"><input type="number" defaultValue="90" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                        <td className="p-2"><input type="number" step="0.25" defaultValue="0.00" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                        <td className="p-2"><input type="text" defaultValue="6/6" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-bold text-white">OS (Left Eye)</td>
+                        <td className="p-2"><input type="number" step="0.25" defaultValue="-2.00" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                        <td className="p-2"><input type="number" step="0.25" defaultValue="-0.50" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                        <td className="p-2"><input type="number" defaultValue="85" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                        <td className="p-2"><input type="number" step="0.25" defaultValue="0.00" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                        <td className="p-2"><input type="text" defaultValue="6/6" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded p-1.5 text-white" /></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Pupillary Distance (PD mm)</label>
+                    <input type="number" defaultValue="64" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded-xl p-2 text-white" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Lens Recommendations</label>
+                    <input type="text" defaultValue="Anti-Blue Light Prevencia Coating" className="w-full bg-[#0A0A0B] border border-[#26262E] rounded-xl p-2 text-white" />
+                  </div>
+                </div>
+                <button onClick={() => alert('Prescription record saved!')} className="px-5 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs font-mono">
+                  Save Prescription Record
+                </button>
+              </div>
+            )}
+
+            {/* Inventory Tab */}
+            {activeTab === 'inventory' && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center bg-[#0F0F12] border border-[#1E1E24] p-4 rounded-2xl">
+                  <h2 className="text-base font-bold text-white">📦 Optical Store Inventory ({inventory.length} SKUs)</h2>
+                  <button
+                    onClick={() => {
+                      const name = prompt('Product Name:');
+                      if (!name) return;
+                      const price = Number(prompt('Selling Price (PKR):', '5000')) || 5000;
+                      const sku = `SO-FRM-${1000 + inventory.length + 1}`;
+                      setInventory(prev => [{ id: 'inv_' + Date.now(), sku, barcodeSKU: sku, name, category: 'Frame', brand: 'Shaheer Custom', purchaseCost: 3000, sellingPrice: price, currentStock: 10, minStockAlert: 2 }, ...prev]);
+                    }}
+                    className="px-3 py-1.5 bg-amber-500 text-slate-950 font-bold text-xs rounded-xl font-mono"
+                  >
+                    + Add Product
+                  </button>
+                </div>
+                <div className="overflow-x-auto border border-[#1E1E24] rounded-2xl bg-[#0F0F12]">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-[#141418] text-slate-400 uppercase text-[10px] border-b border-[#1E1E24]">
+                      <tr>
+                        <th className="p-3">SKU</th>
+                        <th className="p-3">Item</th>
+                        <th className="p-3">Stock</th>
+                        {userRole === 'Admin' && <th className="p-3">Cost Price</th>}
+                        <th className="p-3">Retail Price</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1E1E24]">
+                      {inventory.map(item => (
+                        <tr key={item.id} className="hover:bg-[#121217]">
+                          <td className="p-3 font-bold text-amber-400">{item.sku}</td>
+                          <td className="p-3 font-semibold text-white">{item.name} ({item.brand})</td>
+                          <td className={`p-3 font-bold ${item.currentStock <= item.minStockAlert ? 'text-red-400' : 'text-emerald-400'}`}>{item.currentStock} units</td>
+                          {userRole === 'Admin' && <td className="p-3 text-slate-400">PKR {item.purchaseCost}</td>}
+                          <td className="p-3 font-bold text-white">PKR {item.sellingPrice.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Labels Tab */}
+            {activeTab === 'labels' && (
+              <div className="bg-[#0F0F12] border border-[#1E1E24] rounded-2xl p-6 max-w-xl mx-auto space-y-4 text-center">
+                <h2 className="text-base font-bold text-white">🏷️ Printable Optical Barcode Tag</h2>
+                <select
+                  value={selectedStickerItem?.id}
+                  onChange={(e) => setSelectedStickerItem(inventory.find(i => i.id === e.target.value))}
+                  className="w-full bg-[#0A0A0B] border border-[#26262E] rounded-xl p-2 text-xs text-white font-mono"
+                >
+                  {inventory.map(i => <option key={i.id} value={i.id}>{i.sku} - {i.name}</option>)}
+                </select>
+                <div id="printable-area" className="bg-white text-black p-4 rounded-xl max-w-xs mx-auto font-mono">
+                  <div className="text-[11px] font-bold uppercase">SHAHEER OPTICALS</div>
+                  <div className="text-[10px] font-semibold truncate">{selectedStickerItem?.name}</div>
+                  <div className="my-2 flex justify-center">
+                    <svg id="barcode-canvas" className="w-full max-h-14"></svg>
+                  </div>
+                  <div className="flex justify-between text-[10px] font-bold border-t border-dashed border-slate-400 pt-1">
+                    <span>{selectedStickerItem?.sku}</span>
+                    <span>PKR {selectedStickerItem?.sellingPrice.toLocaleString()}</span>
+                  </div>
+                </div>
+                <BarcodeRenderer sku={selectedStickerItem?.sku || 'SO-FRM-1001'} />
+                <button onClick={() => window.print()} className="px-5 py-2 bg-amber-500 text-slate-950 font-bold text-xs font-mono rounded-xl">
+                  🖨️ Print Barcode Tag
+                </button>
+              </div>
+            )}
+
+            {/* Invoices Tab */}
+            {activeTab === 'sales' && (
+              <div className="space-y-4">
+                <h2 className="text-base font-bold text-white">📋 Invoices & WhatsApp Dispatch ({sales.length})</h2>
+                <div className="overflow-x-auto border border-[#1E1E24] rounded-2xl bg-[#0F0F12]">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-[#141418] text-slate-400 uppercase text-[10px] border-b border-[#1E1E24]">
+                      <tr>
+                        <th className="p-3">Invoice</th>
+                        <th className="p-3">Customer</th>
+                        <th className="p-3">Total</th>
+                        <th className="p-3">Advance</th>
+                        <th className="p-3">Balance</th>
+                        <th className="p-3">WhatsApp Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1E1E24]">
+                      {sales.map(sale => (
+                        <tr key={sale.id} className="hover:bg-[#121217]">
+                          <td className="p-3 font-bold text-amber-400">{sale.invoiceNumber}</td>
+                          <td className="p-3 font-semibold text-white">{sale.customer.name}</td>
+                          <td className="p-3 font-bold text-white">PKR {sale.grandTotal.toLocaleString()}</td>
+                          <td className="p-3 text-emerald-400">PKR {sale.advancePaid.toLocaleString()}</td>
+                          <td className="p-3 text-amber-500 font-bold">PKR {sale.balanceDue.toLocaleString()}</td>
+                          <td className="p-3">
+                            <button
+                              onClick={() => sendViaWhatsApp(sale)}
+                              className="px-2.5 py-1 rounded bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 border border-emerald-500/30 text-[11px] font-bold"
+                            >
+                              💬 Send via WhatsApp
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* Checkout Success Modal */}
+          {activeReceiptSale && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-[#0F0F12] border border-[#1E1E24] rounded-2xl max-w-md w-full p-5 space-y-4">
+                <div className="flex justify-between items-center border-b border-[#1E1E24] pb-2">
+                  <h3 className="font-bold text-white text-sm">🎉 Invoice {activeReceiptSale.invoiceNumber} Ready</h3>
+                  <button onClick={() => setActiveReceiptSale(null)} className="text-slate-400 font-bold text-lg">×</button>
+                </div>
+                <div className="text-xs font-mono space-y-1 bg-[#0A0A0B] p-3 rounded-xl border border-[#1E1E24]">
+                  <div>Customer: <b className="text-white">{activeReceiptSale.customer.name}</b></div>
+                  <div>Grand Total: <b className="text-white">PKR {activeReceiptSale.grandTotal.toLocaleString()}</b></div>
+                  <div>Advance: <b className="text-emerald-400">PKR {activeReceiptSale.advancePaid.toLocaleString()}</b></div>
+                  <div>Balance: <b className="text-amber-500">PKR {activeReceiptSale.balanceDue.toLocaleString()}</b></div>
+                </div>
+                <button
+                  onClick={() => sendViaWhatsApp(activeReceiptSale)}
+                  className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs font-mono"
+                >
+                  💬 Send WhatsApp Receipt to Customer
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function BarcodeRenderer({ sku }) {
+      useEffect(() => {
+        if (window.JsBarcode) {
+          try {
+            window.JsBarcode("#barcode-canvas", sku, {
+              format: "CODE128",
+              width: 1.8,
+              height: 40,
+              displayValue: false,
+              margin: 0
+            });
+          } catch (e) {
+            console.error('Barcode error:', e);
+          }
+        }
+      }, [sku]);
+      return null;
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
